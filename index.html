@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radar Anti-Golpe</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>🛡️ Radar Anti-Golpe<span class="cursor">_</span></h1>
+      <p class="subtitulo">&gt; Central de defesa digital. Cole uma mensagem suspeita e descubra os sinais de golpe.</p>
+      <a class="btn-jogo" href="jogo/index.html">▶ Jogar Escape Room</a>
+    </header>
+
+    <section class="card">
+      <label for="mensagem">Mensagem ou link:</label>
+      <textarea id="mensagem" rows="6" placeholder="Cole aqui a mensagem..."></textarea>
+      <button id="btn-analisar">Analisar</button>
+    </section>
+
+    <section id="resultado" class="card hidden">
+      <h2>Resultado</h2>
+      <p id="veredito" class="veredito"></p>
+      <p id="pontuacao"></p>
+      <ul id="sinais"></ul>
+    </section>
+
+    
+    
+    <footer>
+      <p class="aviso">Simulação educativa e defensiva. Nenhuma mensagem é enviada ou aberta.</p>
+    </footer>
+  </main>
+
+  <script src="js/regras.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
