@@ -1,0 +1,1788 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scape Room – Defesa Digital SENAI</title>
+    <style>
+      /* ===== CORES (iguais às do site Radar Anti-Golpe) ===== */
+:root {
+  --bg: #0a1628;
+  --p: #0f2342;
+  --b: #38bdf8;
+  --g: #22c55e;
+  --r: #ef4444;
+  --w: #f1f5f9;
+  --y: #facc15;
+}
+
+* { box-sizing: border-box; }
+
+/* Fundo quadriculado, igual ao do site */
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--w);
+  font: 18px/1.5 Consolas, "Courier New", ui-monospace, monospace;
+  min-height: 100vh;
+}
+
+main { max-width: 960px; margin: auto; padding: 14px; }
+main:focus { outline: none; }
+
+/* Títulos com brilho */
+h1, h2, h3 { color: var(--b); line-height: 1.25; }
+h1 { text-shadow: 0 0 12px rgba(56, 189, 248, 0.5); }
+
+/* Cartões com borda azul e brilho leve */
+.card {
+  background: rgba(15, 35, 66, 0.9);
+  border: 1px solid var(--b);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.18);
+  animation: in 0.35s;
+}
+
+button, select, input { font: inherit; }
+
+/* Botão principal verde, como o "Analisar" do site */
+button {
+  background: var(--g);
+  color: #052e16;
+  border: 2px solid var(--g);
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin: 5px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 48px;
+}
+button.sec { background: #13305a; color: var(--w); border-color: var(--b); }
+button.opt { display: block; width: 100%; text-align: left; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:hover:not(:disabled) { filter: brightness(1.2); }
+:focus-visible { outline: 3px solid var(--y); outline-offset: 2px; }
+
+/* Campos escuros, como a caixa de texto do site */
+input, select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--b);
+  background: var(--bg);
+  color: var(--w);
+  width: 100%;
+  max-width: 440px;
+  margin: 4px 0;
+}
+input:focus { outline: none; box-shadow: 0 0 8px rgba(56, 189, 248, 0.6); }
+
+/* Barra de status */
+#hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 8px 14px;
+  background: rgba(10, 22, 40, 0.95);
+  border-bottom: 1px solid var(--b);
+  box-shadow: 0 2px 14px rgba(56, 189, 248, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+#hud:empty { display: none; }
+
+.bar { height: 14px; background: #12335e; border-radius: 7px; overflow: hidden; flex: 1 1 100%; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--g), var(--b)); transition: width 0.5s; }
+
+.ok { border-color: var(--g) !important; background: #0f4d2a !important; color: #fff !important; }
+.bad { border-color: var(--r) !important; background: #6b1620 !important; color: #fff !important; }
+
+.map { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 10px; }
+.packet { border: 2px dashed var(--b); border-radius: 10px; padding: 14px; margin: 8px 0; background: var(--bg); animation: slide 0.5s; }
+.wall { height: 10px; background: repeating-linear-gradient(90deg, var(--r) 0 20px, #7f1d1d 20px 40px); border-radius: 5px; }
+.dim { color: #94a3b8; font-size: 0.9em; }
+.err { color: var(--y); }
+
+/* Certificado (continua branco, para imprimir) */
+.cert { border: 6px double #b8860b; text-align: center; background: #fff; padding: 20px; border-radius: 8px; }
+.cert * { color: #031225; }
+
+.shake { animation: sh 0.4s; }
+footer { max-width: 960px; margin: auto; padding: 10px 14px 24px; font-size: 0.85em; color: #94a3b8; }
+
+@keyframes in { from { opacity: 0; transform: translateY(10px); } }
+@keyframes slide { from { opacity: 0; transform: translateX(-30px); } }
+@keyframes sh { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+@media print {
+  #hud, footer, button { display: none !important; }
+  body { background: #fff; }
+}
+    </style>
+  </head>
+  <body>
+    <header id="hud" aria-label="Status do jogo"></header>
+    <main id="app" tabindex="-1"></main>
+    <footer>
+      🔒 Todas as atividades são simulações educativas e defensivas. Nenhuma
+      técnica de invasão real é ensinada.
+      <button id="snd" class="sec" aria-pressed="true">🔊 Som: ligado</button>
+    </footer>
+
+    <script>
+      "use strict";
+      /* =====================================================================
+   1. DADOS DOS NÍVEIS  (nome, ícone, medalha, narrativa, resumo, 5 fases [nome, conceito])
+      seq = tipos de desafio do nível (rotacionam a cada fase)
+   ===================================================================== */
+      const LEVELS = [
+        {
+          n: "Senhas Seguras",
+          ic: "🔑",
+          medal: "🥉 Medalha Cadeado de Bronze",
+          seq: ["mc", "pass", "tf", "ma", "ac"],
+          end: "O Byte Sombrio tentou adivinhar as senhas da secretaria e falhou. As contas dos professores estão protegidas!",
+          sum: "Senhas longas e variadas, frases-senha, autenticação em dois fatores e uma senha diferente para cada conta.",
+          phases: [
+            [
+              "Tamanho da senha",
+              "Quanto mais longa a senha, mais combinações um invasor teria de testar.",
+            ],
+            [
+              "Combinação de caracteres",
+              "Misturar maiúsculas, minúsculas, números e símbolos aumenta a variedade.",
+            ],
+            [
+              "Frases-senha",
+              "Uma frase-senha longa costuma ser mais segura e mais fácil de memorizar.",
+            ],
+            [
+              "Dois fatores",
+              "Autenticação em dois fatores adiciona uma segunda camada de proteção.",
+            ],
+            [
+              "Reutilização",
+              "Reutilizar senhas é arriscado: um vazamento expõe todas as contas.",
+            ],
+          ],
+        },
+        {
+          n: "Criptografia",
+          ic: "🔐",
+          medal: "🥈 Medalha Chave de Prata",
+          seq: ["mc", "caesar", "tf", "or", "ma"],
+          end: "As mensagens dos servidores agora viajam cifradas. O Byte Sombrio só enxerga letras sem sentido!",
+          sum: "Texto simples, texto cifrado, chave, cifra de César e a diferença entre codificar e criptografar.",
+          phases: [
+            [
+              "Texto simples e cifrado",
+              "Criptografia transforma uma informação legível em um conteúdo protegido por uma chave.",
+            ],
+            [
+              "Chave",
+              "Sem a chave correta, o texto cifrado não pode ser lido facilmente.",
+            ],
+            [
+              "Cifra de César",
+              "A cifra de César desloca cada letra do alfabeto um número fixo de posições.",
+            ],
+            [
+              "Codificar x criptografar",
+              "Codificação muda o formato dos dados, mas não foi criada para manter segredos.",
+            ],
+            [
+              "Decifrando",
+              "Quem conhece a cifra e a chave volta ao texto simples.",
+            ],
+          ],
+        },
+        {
+          n: "Phishing e Engenharia Social",
+          ic: "🎣",
+          medal: "🏅 Medalha Olho Clínico",
+          seq: ["mc", "phish", "tf", "ac", "ma"],
+          end: "Os e-mails falsos do Byte Sombrio foram barrados. A escola aprendeu a desconfiar antes de clicar!",
+          sum: "Sinais de mensagens suspeitas, links falsos, urgência, anexos perigosos e engenharia social.",
+          phases: [
+            [
+              "Mensagens suspeitas",
+              "Phishing tenta enganar a pessoa para que ela entregue informações ou abra conteúdos perigosos.",
+            ],
+            [
+              "Links falsos",
+              "Antes de clicar, verifique o endereço real do link e confirme quem enviou a mensagem.",
+            ],
+            [
+              "Pedidos urgentes",
+              "Golpistas criam pressa e medo para você não pensar.",
+            ],
+            [
+              "Anexos perigosos",
+              "Anexos inesperados podem esconder programas maliciosos.",
+            ],
+            [
+              "Engenharia social",
+              "Engenharia social engana pessoas, não máquinas. Confirme por outro canal.",
+            ],
+          ],
+        },
+        {
+          n: "Redes e Proteção de Dados",
+          ic: "🌐",
+          medal: "🏆 Medalha Muralha de Fogo",
+          seq: ["mc", "fw", "tf", "or", "ac"],
+          end: "O firewall da escola está ativo, o Wi-Fi seguro e os backups em dia. A rede resiste aos ataques!",
+          sum: "Firewall, Wi-Fi seguro, atualizações, antivírus, backup, privacidade e menor privilégio.",
+          phases: [
+            [
+              "Firewall",
+              "O firewall filtra o tráfego e bloqueia o que é suspeito.",
+            ],
+            [
+              "Wi-Fi seguro",
+              "Use redes com senha e criptografia WPA2/WPA3; evite redes abertas.",
+            ],
+            [
+              "Atualizações e antivírus",
+              "Atualizações corrigem falhas e o antivírus ajuda a detectar ameaças.",
+            ],
+            [
+              "Backup",
+              "Backups guardados separadamente permitem recuperar dados após um ataque.",
+            ],
+            [
+              "Privacidade e menor privilégio",
+              "Cada pessoa deve ter só o acesso de que precisa.",
+            ],
+          ],
+        },
+        {
+          n: "Defesa Final da Escola",
+          ic: "🛡️",
+          medal: "👑 Medalha Guardião Digital",
+          seq: ["phish", "caesar", "fw", "pass", "ac"],
+          end: "Os servidores foram protegidos e os dados recuperados. O Byte Sombrio foi derrotado!",
+          sum: "Senhas, criptografia, phishing, redes e backup trabalhando juntos: defesa em camadas.",
+          phases: [
+            [
+              "Servidores em alerta",
+              "Defesa em camadas combina várias proteções.",
+            ],
+            [
+              "Ameaças simuladas",
+              "Identificar sinais de ataque rapidamente reduz os danos.",
+            ],
+            [
+              "Cifras e senhas",
+              "Senhas fortes e criptografia protegem dados mesmo se algo falhar.",
+            ],
+            ["Tráfego da rede", "Filtrar o tráfego impede que ameaças entrem."],
+            [
+              "Recuperação dos dados",
+              "Backup e plano de resposta restauram os dados da escola.",
+            ],
+          ],
+        },
+      ];
+
+      /* =====================================================================
+   BANCO DE PERGUNTAS — ÁREA DO PROFESSOR
+   Para adicionar perguntas, inclua itens nas listas abaixo seguindo o formato:
+   mc: [pergunta, respostaCorreta, [errada1, errada2, errada3], explicação]
+   tf: [afirmação, true/false, explicação]
+   ac: [situação, melhorAção, [ações erradas], explicação]
+   or: [título, [passos na ORDEM CORRETA], explicação]
+   ma: [termo, definição]
+   ===================================================================== */
+      const BANK = [
+        {
+          mc: [
+            [
+              "Qual senha é mais forte?",
+              "Verde!Casa#Rio92Lua",
+              ["123456", "senha2024", "joao1999"],
+              "Senhas longas, variadas e sem dados pessoais são mais difíceis de adivinhar.",
+            ],
+            [
+              "O que é uma frase-senha?",
+              "Várias palavras unidas em uma senha longa",
+              [
+                "Uma senha só com 4 números",
+                "Seu nome de trás para frente",
+                "A mesma senha em todos os sites",
+              ],
+              "Uma frase-senha longa costuma ser mais segura e mais fácil de memorizar.",
+            ],
+            [
+              "O que é autenticação em dois fatores?",
+              "Uma segunda prova de identidade além da senha",
+              [
+                "Usar duas senhas iguais",
+                "Ter duas contas no mesmo site",
+                "Trocar a senha duas vezes",
+              ],
+              "Autenticação em dois fatores adiciona uma segunda camada de proteção.",
+            ],
+            [
+              "Qual o risco de reutilizar a mesma senha?",
+              "Um vazamento em um site expõe as outras contas",
+              [
+                "O computador fica lento",
+                "Nenhum, é mais prático e seguro",
+                "A senha expira mais rápido",
+              ],
+              "Senhas vazadas são testadas em outros serviços. Use uma diferente em cada conta.",
+            ],
+          ],
+          tf: [
+            [
+              "Quanto maior a senha, mais difícil descobri-la.",
+              true,
+              "Cada caractere extra multiplica o número de combinações.",
+            ],
+            [
+              "Data de aniversário é uma boa senha.",
+              false,
+              "Dados pessoais são fáceis de descobrir.",
+            ],
+            [
+              "O 2FA ajuda mesmo se a senha for descoberta.",
+              true,
+              "O invasor ainda precisaria do segundo fator, como um código no celular.",
+            ],
+          ],
+          ac: [
+            [
+              "Chegou um código de 2FA que você não pediu.",
+              "Não informar o código e trocar a senha",
+              ["Passar o código a quem pedir", "Ignorar e não fazer nada"],
+              "Código inesperado indica que alguém tentou entrar na sua conta.",
+            ],
+            [
+              "Um site que você usa vazou dados.",
+              "Trocar a senha dele e a das contas que usavam a mesma",
+              [
+                "Esperar para ver o que acontece",
+                "Mudar só uma letra da senha",
+              ],
+              "Troque as senhas rapidamente e ative o 2FA.",
+            ],
+          ],
+          or: [
+            [
+              "Criar uma conta nova com segurança",
+              [
+                "Escolher uma frase-senha longa",
+                "Usá-la somente nesta conta",
+                "Ativar a autenticação em dois fatores",
+                "Guardar a senha em um gerenciador",
+              ],
+              "Senha forte, exclusiva e com 2FA formam uma boa defesa.",
+            ],
+          ],
+          ma: [
+            ["Senha forte", "Longa e com caracteres variados"],
+            ["2FA", "Segunda camada de proteção"],
+            ["Frase-senha", "Várias palavras formando senha longa"],
+            ["Gerenciador", "Guarda e gera senhas com segurança"],
+            ["Reutilizar", "Um vazamento expõe várias contas"],
+          ],
+        },
+        {
+          mc: [
+            [
+              "O que é texto cifrado?",
+              "Informação transformada, ilegível sem a chave",
+              [
+                "Texto em letra grande",
+                "Texto sem erros de ortografia",
+                "Texto copiado de um site",
+              ],
+              "Criptografia transforma uma informação legível em um conteúdo protegido por uma chave.",
+            ],
+            [
+              "Na cifra de César com deslocamento 3, a letra A vira…",
+              "D",
+              ["B", "C", "Z"],
+              "Cada letra anda 3 posições: A→B→C→D.",
+            ],
+            [
+              "Qual a diferença entre codificar e criptografar?",
+              "Codificar muda o formato; criptografar protege com chave",
+              [
+                "São a mesma coisa",
+                "Codificar protege mais",
+                "Criptografar só serve para imagens",
+              ],
+              "Codificação (como Base64) não foi criada para guardar segredos; qualquer um a desfaz.",
+            ],
+            [
+              "Para que serve a chave na criptografia?",
+              "Para cifrar e decifrar a informação",
+              [
+                "Para abrir a porta da sala",
+                "Para deixar o texto maior",
+                "Para apagar mensagens",
+              ],
+              "Sem a chave correta, o texto cifrado fica ilegível.",
+            ],
+          ],
+          tf: [
+            [
+              "Texto simples é a informação legível, antes de cifrar.",
+              true,
+              "Texto simples é o original; texto cifrado é o resultado protegido.",
+            ],
+            [
+              "Base64 é uma forma segura de guardar senhas.",
+              false,
+              "Base64 é codificação e qualquer pessoa consegue reverter.",
+            ],
+            [
+              "A cifra de César é simples demais para proteger dados reais.",
+              true,
+              "Ela tem poucas chaves possíveis; hoje usamos algoritmos modernos.",
+            ],
+          ],
+          ac: [
+            [
+              "Você precisa enviar notas de alunos por uma rede pública.",
+              "Enviar por canal criptografado (HTTPS ou arquivo cifrado)",
+              ["Só converter para Base64", "Enviar por um site desconhecido"],
+              "Codificar não protege; criptografar sim.",
+            ],
+            [
+              "Você achou a chave de um arquivo cifrado em um papel solto.",
+              "Trocar a chave e guardá-la com segurança",
+              ["Deixar o papel onde está", "Copiar a chave em vários murais"],
+              "A segurança da criptografia depende de manter a chave secreta.",
+            ],
+          ],
+          or: [
+            [
+              "Enviar uma mensagem cifrada",
+              [
+                "Escrever o texto simples",
+                "Escolher a chave",
+                "Aplicar a cifra",
+                "Enviar o texto cifrado",
+              ],
+              "O destinatário usa a chave para voltar ao texto simples.",
+            ],
+          ],
+          ma: [
+            ["Texto simples", "Informação legível original"],
+            ["Texto cifrado", "Resultado ilegível sem a chave"],
+            ["Chave", "Segredo usado para cifrar ou decifrar"],
+            ["Cifra de César", "Desloca letras no alfabeto"],
+            ["Codificação", "Muda o formato, sem segredo"],
+          ],
+        },
+        {
+          mc: [
+            [
+              "Qual sinal indica phishing?",
+              "Pedido urgente para informar a senha por link",
+              [
+                "Aviso de aula na plataforma oficial",
+                "Mensagem de colega numa conversa já existente",
+                "Boletim publicado no site oficial",
+              ],
+              "Phishing tenta enganar a pessoa para que ela entregue informações ou abra conteúdos perigosos.",
+            ],
+            [
+              "Antes de clicar em um link, o que fazer?",
+              "Verificar o endereço real e quem enviou",
+              [
+                "Clicar rápido para não perder o prazo",
+                "Encaminhar para todos os contatos",
+                "Olhar só o texto do botão",
+              ],
+              "Antes de clicar, verifique o endereço real do link e confirme quem enviou a mensagem.",
+            ],
+            [
+              "O que é engenharia social?",
+              "Enganar pessoas para obter informações ou acesso",
+              [
+                "Um programa antivírus",
+                "Um tipo de cabo de rede",
+                "Um curso sobre redes sociais",
+              ],
+              "O alvo é a pessoa, não a máquina.",
+            ],
+            [
+              "Um anexo .exe inesperado chegou por e-mail.",
+              "Não abrir e avisar o suporte",
+              [
+                "Abrir para ver o que é",
+                "Executar com o antivírus desligado",
+                "Salvar no pendrive",
+              ],
+              "Anexos inesperados podem esconder programas maliciosos.",
+            ],
+          ],
+          tf: [
+            [
+              "Bancos e escolas pedem sua senha completa por e-mail.",
+              false,
+              "Empresas sérias não pedem senha por mensagem.",
+            ],
+            [
+              "Mensagens com pressa e ameaças merecem desconfiança.",
+              true,
+              "Urgência e medo fazem a pessoa agir sem pensar.",
+            ],
+            [
+              "Se a mensagem parece vir de um amigo, é sempre segura.",
+              false,
+              "A conta do amigo pode ter sido invadida; confirme por outro canal.",
+            ],
+          ],
+          ac: [
+            [
+              'Um "diretor" pede por mensagem que você compre cartões-presente com urgência.',
+              "Confirmar com ele pessoalmente ou por telefone",
+              ["Comprar e enviar os códigos", "Responder com seus dados"],
+              "Confirme o pedido por outro canal antes de agir.",
+            ],
+            [
+              "Você clicou em um link suspeito e digitou sua senha.",
+              "Trocar a senha, ativar 2FA e avisar o suporte",
+              [
+                "Esperar para ver se algo acontece",
+                "Apagar a mensagem e esquecer",
+              ],
+              "Agir rápido limita os danos.",
+            ],
+          ],
+          or: [
+            [
+              "Receber uma mensagem suspeita",
+              [
+                "Não clicar no link",
+                "Verificar o remetente",
+                "Avisar o suporte ou o professor",
+                "Apagar a mensagem",
+              ],
+              "Parar, verificar, avisar e só então apagar.",
+            ],
+          ],
+          ma: [
+            ["Phishing", "Mensagem falsa para roubar dados"],
+            ["Link falso", "Endereço que imita um site confiável"],
+            ["Urgência", "Pressa criada para você não pensar"],
+            ["Anexo", "Arquivo que pode esconder ameaça"],
+            ["Engenharia social", "Enganar pessoas, não máquinas"],
+          ],
+        },
+        {
+          mc: [
+            [
+              "O que um firewall faz?",
+              "Filtra o tráfego e bloqueia o que é suspeito",
+              [
+                "Deixa o Wi-Fi mais rápido",
+                "Guarda as senhas",
+                "Apaga arquivos antigos",
+              ],
+              "O firewall é como um porteiro da rede.",
+            ],
+            [
+              "Qual Wi-Fi é mais seguro para acessar dados da escola?",
+              "Rede com senha e criptografia WPA2/WPA3",
+              [
+                "Rede aberta sem senha",
+                'Rede chamada "WiFi grátis"',
+                "Qualquer rede com nome conhecido",
+              ],
+              "Redes abertas permitem que outros observem o tráfego.",
+            ],
+            [
+              "Por que atualizar o sistema?",
+              "Atualizações corrigem falhas de segurança",
+              [
+                "Só mudam as cores",
+                "Servem para apagar arquivos",
+                "Não têm relação com segurança",
+              ],
+              "Falhas conhecidas são usadas por atacantes em sistemas desatualizados.",
+            ],
+            [
+              "O que é o princípio do menor privilégio?",
+              "Cada pessoa tem só o acesso de que precisa",
+              [
+                "Todos são administradores",
+                "Ninguém usa senha",
+                "Só o diretor liga o computador",
+              ],
+              "Menos acesso significa menos estrago se uma conta for invadida.",
+            ],
+          ],
+          tf: [
+            [
+              "Backup guardado só no mesmo computador é suficiente.",
+              false,
+              "Mantenha uma cópia separada, para que um ataque não atinja tudo.",
+            ],
+            [
+              "Antivírus ajuda, mas não substitui cuidado e atualizações.",
+              true,
+              "Segurança funciona em camadas.",
+            ],
+            [
+              "Divulgar dados pessoais de alunos em grupos públicos é aceitável.",
+              false,
+              "Privacidade exige limitar quem vê os dados.",
+            ],
+          ],
+          ac: [
+            [
+              "Aparece um pendrive desconhecido no laboratório.",
+              "Não conectar e entregar ao responsável de TI",
+              ["Conectar para ver o que tem", "Levar para casa e abrir"],
+              "Dispositivos desconhecidos podem conter ameaças.",
+            ],
+            [
+              "O sistema avisa que há uma atualização de segurança.",
+              "Instalar assim que possível",
+              ["Adiar para sempre", "Desligar o aviso"],
+              "Atualize logo para fechar falhas conhecidas.",
+            ],
+          ],
+          or: [
+            [
+              "Proteger um computador novo da escola",
+              [
+                "Instalar atualizações",
+                "Ativar firewall e antivírus",
+                "Criar contas com menor privilégio",
+                "Configurar backup automático",
+              ],
+              "Defesa em camadas deixa o computador pronto para uso.",
+            ],
+          ],
+          ma: [
+            ["Firewall", "Filtra o tráfego da rede"],
+            ["Backup", "Cópia para recuperar dados"],
+            ["Antivírus", "Detecta programas maliciosos"],
+            ["Menor privilégio", "Acesso só ao necessário"],
+            ["Atualização", "Corrige falhas de segurança"],
+          ],
+        },
+        {
+          mc: [
+            [
+              "Os arquivos do servidor foram bloqueados por um ataque simulado. O que ajuda a recuperá-los?",
+              "Um backup recente guardado separadamente",
+              ["Pagar o invasor", "Desligar o firewall"],
+              "Backups isolados permitem restaurar os dados.",
+            ],
+            [
+              "Qual combinação protege melhor a conta de um professor?",
+              "Frase-senha longa e autenticação em dois fatores",
+              [
+                "Senha curta igual em tudo",
+                "Compartilhar a senha com o coordenador",
+              ],
+              "Camadas de defesa funcionam juntas.",
+            ],
+          ],
+          tf: [
+            [
+              "Segurança em camadas combina senhas, criptografia, firewall e atenção das pessoas.",
+              true,
+              "Se uma camada falha, as outras ainda protegem.",
+            ],
+          ],
+          ac: [
+            [
+              "Alertas mostram um login estranho no servidor às 3h da manhã.",
+              "Isolar o acesso, trocar senhas e avisar o responsável",
+              ["Ignorar até segunda-feira", "Apagar os registros do sistema"],
+              "Registros ajudam a entender o incidente; nunca os apague.",
+            ],
+          ],
+          or: [
+            [
+              "Responder a um incidente simulado",
+              [
+                "Identificar o alerta",
+                "Isolar o sistema afetado",
+                "Restaurar o backup",
+                "Revisar e melhorar as defesas",
+              ],
+              "Conter, recuperar e aprender com o incidente.",
+            ],
+          ],
+          ma: [
+            ["Defesa em camadas", "Várias proteções combinadas"],
+            ["Incidente", "Evento que ameaça a segurança"],
+            ["Restaurar", "Recuperar dados a partir do backup"],
+          ],
+        },
+      ];
+      // Nível 5 usa tudo dos níveis anteriores
+      const ALL = {};
+      ["mc", "tf", "ac", "or", "ma"].forEach(
+        (t) => (ALL[t] = [].concat(...BANK.map((b) => b[t] || []))),
+      );
+      // Mensagens para classificar: [remetente, texto, éPhishing, explicação]
+      const PH = [
+        [
+          "suporte@escola-seguranca.top",
+          "URGENTE! Sua conta será apagada em 1 hora. Entre em http://escola-login.top e digite sua senha.",
+          true,
+          "Pressa, ameaça e link estranho são sinais de phishing.",
+        ],
+        [
+          "secretaria@escola.edu.br",
+          "O boletim está disponível no portal oficial. Acesse pelo endereço que você já usa.",
+          false,
+          "Remetente conhecido, sem pressão e sem link suspeito.",
+        ],
+        [
+          "premios@sorteio-gratis.xyz",
+          "Parabéns! Você ganhou um celular. Baixe premio.exe para receber.",
+          true,
+          "Prêmio inesperado e arquivo .exe são sinais de perigo.",
+        ],
+        [
+          "prof.marcos@escola.edu.br",
+          "Pessoal, a aula de amanhã será no laboratório 2. Levem o caderno.",
+          false,
+          "Aviso comum de remetente conhecido, sem pedir dados.",
+        ],
+        [
+          "banco@banc0-seguro.net",
+          "Detectamos acesso suspeito. Confirme CPF e senha neste link para evitar bloqueio.",
+          true,
+          "Bancos não pedem senha por link e o endereço imita o oficial.",
+        ],
+        [
+          "ti@escola.edu.br",
+          "Manutenção do Wi-Fi sábado às 8h. Nenhuma ação é necessária.",
+          false,
+          "Aviso informativo, sem links nem pedidos.",
+        ],
+        [
+          "rh@empresa-vagas.top",
+          "Vaga garantida! Envie foto do RG e a senha do seu e-mail para começar hoje.",
+          true,
+          "Ninguém legítimo pede senha. Isso é golpe para roubar dados.",
+        ],
+        [
+          "ana@escola.edu.br",
+          "Ana aqui! Mandei o trabalho no grupo, confere depois do intervalo?",
+          false,
+          "Contexto esperado e nenhuma ação arriscada pedida.",
+        ],
+      ];
+      // Tráfego do firewall: [descrição, éSeguro]
+      const FW = [
+        ["Aluno acessa o portal da escola (porta 443)", true],
+        ["Atualização oficial do sistema operacional", true],
+        ["Impressora da escola envia status à rede interna", true],
+        ["Backup noturno para o servidor da escola", true],
+        ["Aula online pelo sistema autorizado", true],
+        ["IP desconhecido tenta entrar pela porta 23 (Telnet)", false],
+        ["Milhares de tentativas de login em 1 segundo", false],
+        [
+          "Programa tenta enviar dados dos alunos a um servidor suspeito",
+          false,
+        ],
+        ["Varredura de portas vinda da internet", false],
+        ["Arquivo .exe chegando de site não confiável", false],
+      ];
+      const WORDS = [
+        "REDE",
+        "DADOS",
+        "CHAVE",
+        "SENHA",
+        "ESCOLA",
+        "SEGURO",
+        "CODIGO",
+        "ACESSO",
+        "BACKUP",
+        "SISTEMA",
+      ];
+
+      // Dicas mostradas no topo de cada tipo de desafio
+const DICAS = {
+  mc: "Leia a pergunta e escolha a resposta que parece mais correta. Se errar, a explicação mostra o porquê.",
+  rev: "Revisão do nível: use o que você aprendeu nas fases anteriores.",
+  tf: "Decida se a afirmação é verdadeira ou falsa. Pense: isso protegeria ou colocaria os dados em risco?",
+  ac: "Algo suspeito aconteceu. Escolha a ação que protege você e os dados da escola.",
+  ma: "Em cada conceito, escolha a definição que combina e clique em Verificar.",
+  or: "Clique nas ações na ordem em que devem ser feitas, do primeiro ao último passo.",
+  pass: "Crie uma senha FICTÍCIA que cumpra todos os itens da lista. Os ✅ aparecem enquanto você digita.",
+  caesar: "Na cifra de César, cada letra anda um número fixo de posições no alfabeto. Conte usando a lista abaixo.",
+  phish: "Leia o remetente e o texto. Pressa, ameaças, prêmios e links estranhos são sinais de golpe.",
+  fw: "Cada pacote é um tráfego de rede. Permita o que é normal e bloqueie o que parece ataque.",
+};
+
+      /* =====================================================================
+   2. LÓGICA: estado, salvamento, pontuação, vidas, progresso
+   ===================================================================== */
+      const KEY = "scaperoom_senai_v1";
+      const def = () => ({
+        name: "",
+        lives: 3,
+        score: 0,
+        streak: 0,
+        front: 0,
+        fstep: 0,
+        lv: 0,
+        ph: 0,
+        st: 0,
+      });
+      function load() {
+        try {
+          const o = JSON.parse(localStorage.getItem(KEY));
+          if (
+            o &&
+            typeof o.name === "string" &&
+            [
+              "lives",
+              "score",
+              "streak",
+              "front",
+              "fstep",
+              "lv",
+              "ph",
+              "st",
+            ].every((k) => Number.isInteger(o[k]) && o[k] >= 0) &&
+            o.lives <= 3 &&
+            o.front <= 25 &&
+            o.lv < 5 &&
+            o.ph < 5 &&
+            o.st < 5 &&
+            o.fstep < 5
+          )
+            return Object.assign(def(), o, { name: o.name.slice(0, 20) });
+        } catch (e) {}
+        return def();
+      }
+      function save() {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(S));
+        } catch (e) {}
+      }
+      let S = load(),
+        used = {},
+        locked = false,
+        snd = true,
+        ac = null;
+      const mult = () => Math.min(5, 1 + S.streak); // multiplicador de pontos
+      const pct = () =>
+        Math.round(((S.front * 5 + (S.front < 25 ? S.fstep : 0)) / 125) * 100); // progresso total
+      const rnd = (n) => Math.floor(Math.random() * n);
+      const shuffle = (a) => {
+        a = a.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = rnd(i + 1);
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      };
+      function take(k, arr) {
+        const u = used[k] || (used[k] = []);
+        if (u.length >= arr.length) u.length = 0;
+        let i;
+        do {
+          i = rnd(arr.length);
+        } while (u.includes(i));
+        u.push(i);
+        return arr[i];
+      }
+      const bank = (t) => (S.lv === 4 ? ALL[t] : BANK[S.lv][t]);
+      function beep(f, d = 0.15, t = "sine") {
+        if (!snd) return;
+        try {
+          ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+          const o = ac.createOscillator(),
+            g = ac.createGain();
+          o.type = t;
+          o.frequency.value = f;
+          g.gain.value = 0.07;
+          o.connect(g);
+          g.connect(ac.destination);
+          o.start();
+          o.stop(ac.currentTime + d);
+        } catch (e) {}
+      }
+
+      /* =====================================================================
+   3. RENDERIZAÇÃO: utilitários
+   ===================================================================== */
+      const $ = (s) => document.querySelector(s),
+        app = $("#app");
+      function h(t, a, ...k) {
+        const e = document.createElement(t);
+        for (const x in a || {}) {
+          const v = a[x];
+          if (v == null || v === false) continue;
+          if (x === "class") e.className = v;
+          else if (x.slice(0, 2) === "on") e.addEventListener(x.slice(2), v);
+          else e.setAttribute(x, v === true ? "" : v);
+        }
+        k.flat(9).forEach((c) => {
+          if (c != null && c !== false) e.append(c);
+        });
+        return e;
+      }
+      function show(...n) {
+        app.replaceChildren(...n);
+        window.scrollTo(0, 0);
+        app.focus({ preventScroll: true });
+      }
+      function hud(on) {
+        const e = $("#hud");
+        if (!on) {
+          e.replaceChildren();
+          return;
+        }
+        const p = pct();
+        e.replaceChildren(
+          h("span", {}, "🛡️ Nível " + (S.lv + 1) + "/5"),
+          h("span", {}, "Fase " + (S.ph + 1) + "/5"),
+          h("span", {}, "Etapa " + (S.st + 1) + "/5"),
+          h("span", {}, "⭐ " + S.score),
+          h(
+            "span",
+            { "aria-label": S.lives + " vidas" },
+            "❤️".repeat(S.lives) + "🖤".repeat(3 - S.lives),
+          ),
+          h("span", {}, "Multiplicador x" + mult()),
+          h("span", {}, "Total: " + p + "% (" + Math.round(p * 1.25) + "/125)"),
+          h(
+            "div",
+            {
+              class: "bar",
+              role: "progressbar",
+              "aria-label": "Progresso total",
+              "aria-valuenow": p,
+              "aria-valuemin": 0,
+              "aria-valuemax": 100,
+            },
+            h("i", { style: "width:" + p + "%" }),
+          ),
+        );
+      }
+      $("#snd").onclick = function () {
+        snd = !snd;
+        this.setAttribute("aria-pressed", snd);
+        this.textContent = snd ? "🔊 Som: ligado" : "🔇 Som: desligado";
+      };
+
+      /* =====================================================================
+   4. TELAS
+   ===================================================================== */
+      function home() {
+  hud(false);
+  const nm = h("input", {
+    id: "nm",
+    maxlength: 20,
+    autocomplete: "off",
+    placeholder: "Seu nome",
+  });
+  nm.value = S.name;
+  const err = h("p", { class: "err", role: "alert" });
+
+  const okName = () => {
+    const v = nm.value.trim().replace(/\s+/g, " ");
+    if (!/^[\p{L}0-9 '._-]{2,20}$/u.test(v)) {
+      err.textContent =
+        "Digite um nome de 2 a 20 caracteres (letras, números e espaços).";
+      nm.focus();
+      return false;
+    }
+    S.name = v;
+    return true;
+  };
+
+  const hasProg = S.name && (S.front > 0 || S.fstep > 0 || S.score > 0);
+
+  show(
+    h(
+      "div",
+      { class: "card" },
+      h("h1", {}, "🛡️ SCAPE ROOM"),
+      h(
+        "p",
+        {},
+        'O grupo "Byte Sombrio" quer invadir a rede da escola. Você é o agente de defesa digital. Digite seu nome para começar!'
+      ),
+      h("label", { for: "nm" }, "Nome do agente:"),
+      h("br"),
+      nm,
+      err,
+      h(
+        "div",
+        {},
+        h(
+          "button",
+          {
+            onclick: () => {
+              if (!okName()) return;
+              if (hasProg && !confirm("Isso apaga o progresso salvo. Continuar?"))
+                return;
+              S = Object.assign(def(), { name: S.name });
+              save();
+              tutorial();
+            },
+          },
+          "▶️ Iniciar missão"
+        ),
+        hasProg
+          ? h(
+              "button",
+              {
+                class: "sec",
+                onclick: () => {
+                  if (okName()) {
+                    save();
+                    S.front >= 25 ? final() : map();
+                  }
+                },
+              },
+              "⏩ Continuar missão"
+            )
+          : null
+      )
+    )
+  );
+}
+      function tutorial() {
+        hud(false);
+        show(
+          h(
+            "div",
+            { class: "card" },
+            h("h2", {}, "📋 Como jogar"),
+            h(
+              "ul",
+              {},
+              h("li", {}, "5 níveis × 5 fases × 5 etapas = 125 desafios."),
+              h(
+                "li",
+                {},
+                "Você começa com 3 ❤️. Cada erro tira 1 vida e mostra uma explicação.",
+              ),
+              h(
+                "li",
+                {},
+                "Cada acerto vale 100 pontos. Acertos seguidos aumentam o multiplicador (até x5).",
+              ),
+              h(
+                "li",
+                {},
+                "Ao concluir um nível você ganha uma medalha e 1 vida extra.",
+              ),
+              h(
+                "li",
+                {},
+                "Seu progresso é salvo automaticamente neste navegador.",
+              ),
+            ),
+            h("button", { onclick: map }, "🗺️ Ir para o mapa"),
+          ),
+        );
+      }
+      function map() {
+        hud(true);
+        const lv = LEVELS.map((L, i) =>
+          h(
+            "div",
+            { class: "card" },
+            h(
+              "h3",
+              {},
+              (i * 5 <= S.front ? L.ic : "🔒") +
+                " Nível " +
+                (i + 1) +
+                ": " +
+                L.n,
+            ),
+            L.phases.map((p, j) => {
+              const n = i * 5 + j;
+              return h(
+                "button",
+                {
+                  class: n < S.front ? "sec ok" : "sec opt",
+                  disabled: n > S.front,
+                  onclick: () => startPhase(i, j),
+                },
+                (n > S.front ? "🔒 " : n < S.front ? "✅ " : "▶️ ") +
+                  "Fase " +
+                  (j + 1) +
+                  ": " +
+                  p[0],
+              );
+            }),
+          ),
+        );
+        show(
+          h("h2", {}, "🗺️ Mapa da missão – Agente " + S.name),
+          h("div", { class: "map" }, lv),
+          h(
+            "div",
+            {},
+            S.front >= 25
+              ? h("button", { onclick: final }, "🎓 Ver certificado")
+              : null,
+            h(
+              "button",
+              { class: "sec", onclick: () => learn(map) },
+              "📘 O que aprendemos?",
+            ),
+            h("button", { class: "sec", onclick: home }, "🏠 Menu"),
+            h(
+              "button",
+              {
+                class: "sec",
+                onclick: () => {
+                  if (confirm("Reiniciar todo o progresso?")) {
+                    try {
+                      localStorage.removeItem(KEY);
+                    } catch (e) {}
+                    S = def();
+                    home();
+                  }
+                },
+              },
+              "🔄 Reiniciar progresso",
+            ),
+          ),
+        );
+      }
+      function startPhase(l, p) {
+        S.lv = l;
+        S.ph = p;
+        S.st = l * 5 + p === S.front ? S.fstep : 0;
+        if (S.lives <= 0) S.lives = 3;
+        used = {};
+        save();
+        play();
+      }
+      function play() {
+        hud(true);
+        locked = false;
+        const L = LEVELS[S.lv],
+          area = h("div"),
+          fb = h("div", { "aria-live": "polite" });
+        show(
+          h(
+            "div",
+            { class: "card" },
+            h("h2", {}, L.ic + " " + L.n + " – " + L.phases[S.ph][0]),
+            h(
+              "p",
+              { class: "dim" },
+              "Desafio " + (S.lv * 25 + S.ph * 5 + S.st + 1) + " de 125",
+            ),
+            area,
+            fb,
+          ),
+        );
+        makeChallenge(area, (ok, ex) => answer(ok, ex, area, fb));
+      }
+      function answer(ok, ex, area, fb) {
+        if (locked) return;
+        locked = true;
+        area
+          .querySelectorAll("button,input,select")
+          .forEach((e) => (e.disabled = true));
+        let pts = 0;
+        if (ok) {
+          pts = 100 * mult();
+          S.score += pts;
+          S.streak++;
+          beep(660);
+          setTimeout(() => beep(880), 120);
+        } else {
+          S.lives--;
+          S.streak = 0;
+          beep(180, 0.3, "sawtooth");
+          area.classList.add("shake");
+        }
+        save();
+        hud(true);
+        const btn = ok
+          ? h("button", { onclick: next }, "Continuar ➜")
+          : S.lives <= 0
+            ? h("button", { onclick: over }, "Ver resultado")
+            : h(
+                "button",
+                { onclick: play },
+                "🔁 Tentar novamente com nova pergunta",
+              );
+        fb.replaceChildren(
+          h(
+            "div",
+            { class: "card " + (ok ? "ok" : "bad") },
+            h(
+              "strong",
+              {},
+              ok
+                ? "✅ Correto! +" + pts + " pontos"
+                : "❌ Não foi dessa vez. −1 vida",
+            ),
+            h("p", {}, ex),
+          ),
+          btn,
+        );
+        btn.focus();
+      }
+      function next() {
+        const f = S.lv * 5 + S.ph === S.front;
+        S.st++;
+        if (f) S.fstep = S.st;
+        if (S.st < 5) {
+          save();
+          play();
+          return;
+        }
+        if (f) {
+          S.front++;
+          S.fstep = 0;
+          if (S.ph === 4) S.lives = Math.min(3, S.lives + 1);
+        }
+        S.st = 0;
+        save();
+        phaseEnd();
+      }
+      function phaseEnd() {
+        hud(true);
+        const L = LEVELS[S.lv],
+          last = S.ph === 4;
+        show(
+          h(
+            "div",
+            { class: "card ok" },
+            h("h2", {}, "🎉 Fase concluída!"),
+            h(
+              "p",
+              {},
+              L.n + " – Fase " + (S.ph + 1) + ": " + L.phases[S.ph][0],
+            ),
+            h("p", {}, "Pontuação: " + S.score + " | Vidas: " + S.lives),
+            h(
+              "p",
+              {},
+              h("strong", {}, "Conceito aprendido: "),
+              L.phases[S.ph][1],
+            ),
+            h(
+              "button",
+              { onclick: last ? levelEnd : () => startPhase(S.lv, S.ph + 1) },
+              last ? "🏅 Concluir nível" : "Próxima fase ➜",
+            ),
+            h("button", { class: "sec", onclick: map }, "🗺️ Mapa"),
+          ),
+        );
+      }
+      function levelEnd() {
+        hud(true);
+        const L = LEVELS[S.lv],
+          fin = S.lv === 4;
+        show(
+          h(
+            "div",
+            { class: "card ok" },
+            h("h2", {}, "🏅 Nível " + (S.lv + 1) + " concluído: " + L.n),
+            h("p", {}, L.end),
+            h("h3", {}, L.medal),
+            h("p", {}, h("strong", {}, "Resumo: "), L.sum),
+            h("p", { class: "dim" }, "+1 vida de bônus (máx. 3)."),
+            h(
+              "button",
+              { onclick: fin ? final : map },
+              fin ? "🎓 Ver certificado" : "🗺️ Voltar ao mapa",
+            ),
+          ),
+        );
+      }
+      function over() {
+        hud(true);
+        show(
+          h(
+            "div",
+            { class: "card bad" },
+            h("h2", {}, "💥 Fim de jogo"),
+            h(
+              "p",
+              {},
+              "Suas vidas acabaram, mas todo agente aprende com os erros.",
+            ),
+            h("p", {}, "Pontuação: " + S.score),
+            h(
+              "button",
+              {
+                onclick: () => {
+                  S.lives = 3;
+                  S.streak = 0;
+                  S.st = 0;
+                  if (S.lv * 5 + S.ph === S.front) S.fstep = 0;
+                  used = {};
+                  save();
+                  play();
+                },
+              },
+              "🔁 Tentar novamente",
+            ),
+            h("button", { class: "sec", onclick: home }, "🏠 Voltar ao menu"),
+          ),
+        );
+      }
+      function final() {
+        hud(false);
+        S.front = 25;
+        save();
+        show(
+          h(
+            "div",
+            { class: "card" },
+            h("h1", {}, "🏆 Sistema da escola protegido!"),
+            h(
+              "p",
+              {},
+              "Os dados dos alunos estão seguros e a rede foi restaurada. O Byte Sombrio foi derrotado!",
+            ),
+            h(
+              "div",
+              { class: "cert" },
+              h("h2", {}, "CERTIFICADO"),
+              h("p", {}, "Certificamos que"),
+              h("h1", {}, S.name),
+              h("p", {}, "concluiu a missão e recebeu o título de"),
+              h("h2", {}, "Guardião Digital do SENAI"),
+              h("p", {}, "Pontuação: " + S.score + " pontos"),
+              h("p", {}, "Data: " + new Date().toLocaleDateString("pt-BR")),
+            ),
+            h(
+              "button",
+              { onclick: () => window.print() },
+              "🖨️ Imprimir certificado",
+            ),
+            h("button", { class: "sec", onclick: map }, "🗺️ Mapa"),
+            h(
+              "button",
+              { class: "sec", onclick: () => learn(final) },
+              "📘 O que aprendemos?",
+            ),
+            h(
+              "button",
+              {
+                class: "sec",
+                onclick: () => {
+                  if (confirm("Reiniciar todo o progresso?")) {
+                    try {
+                      localStorage.removeItem(KEY);
+                    } catch (e) {}
+                    S = def();
+                    home();
+                  }
+                },
+              },
+              "🔄 Jogar de novo",
+            ),
+          ),
+        );
+      }
+      function learn(back) {
+        hud(false);
+        show(
+          h("h2", {}, "📘 O que aprendemos?"),
+          LEVELS.map((L, i) =>
+            h(
+              "div",
+              { class: "card" },
+              h("h3", {}, L.ic + " Nível " + (i + 1) + ": " + L.n),
+              h("p", {}, L.sum),
+              h(
+                "ul",
+                {},
+                L.phases.map((p) =>
+                  h("li", {}, h("strong", {}, p[0] + ": "), p[1]),
+                ),
+              ),
+            ),
+          ),
+          h("button", { onclick: back }, "⬅️ Voltar"),
+        );
+      }
+
+      /* =====================================================================
+   5. DESAFIOS (minijogos). Cada um chama fin(acertou, explicação)
+   ===================================================================== */
+      function choices(area, title, q, opts, right, ex, fin) {
+        area.append(h("h3", {}, title), h("p", {}, q));
+        shuffle(opts).forEach((o) => {
+          const b = h(
+            "button",
+            {
+              class: "sec opt",
+              onclick: () => {
+                const ok = o === right;
+                b.classList.add(ok ? "ok" : "bad");
+                if (!ok)
+                  [...area.querySelectorAll(".opt")]
+                    .find((x) => x.textContent === right)
+                    .classList.add("ok");
+                fin(ok, ex);
+              },
+            },
+            o,
+          );
+          area.append(b);
+        });
+      }
+      function makeChallenge(area, fin) {
+        const L = S.lv,
+          P = S.ph,
+          T = S.st,
+          d = L * 5 + P;
+        let t = LEVELS[L].seq[(T + P) % 5],
+          it;
+        if (P === 4 && T === 4) t = "rev"; // última etapa de cada nível: revisão
+        area.append(h("p", { class: "dim" }, DICAS[t]));
+        if (t === "mc" || t === "rev") {
+          it = take(
+            "mc" + t,
+            t === "rev"
+              ? [].concat(...BANK.slice(0, L + 1).map((b) => b.mc))
+              : bank("mc"),
+          );
+          choices(
+            area,
+            t === "rev"
+              ? "🏁 Desafio final do nível: revisão"
+              : "❓ Múltipla escolha",
+            it[0],
+            [it[1]].concat(it[2]),
+            it[1],
+            it[3],
+            fin,
+          );
+        } else if (t === "tf") {
+          it = take("tf", bank("tf"));
+          area.append(
+            h("h3", {}, "⚖️ Verdadeiro ou falso?"),
+            h("p", {}, it[0]),
+          );
+          [true, false].forEach((v) => {
+            const b = h(
+              "button",
+              {
+                class: "sec",
+                onclick: () => {
+                  const ok = v === it[1];
+                  b.classList.add(ok ? "ok" : "bad");
+                  fin(ok, it[2]);
+                },
+              },
+              v ? "✅ Verdadeiro" : "❌ Falso",
+            );
+            area.append(b);
+          });
+        } else if (t === "ac") {
+          it = take("ac", bank("ac"));
+          choices(
+            area,
+            "🚨 Incidente simulado",
+            it[0] + " Qual a melhor ação?",
+            [it[1]].concat(it[2]),
+            it[1],
+            it[3],
+            fin,
+          );
+        } else if (t === "ma") {
+          const pairs = shuffle(bank("ma")).slice(0, 4),
+            defs = shuffle(pairs.map((p) => p[1]));
+          area.append(h("h3", {}, "🔗 Associe o conceito à definição"));
+          const sels = pairs.map((p) => {
+            const s = h(
+              "select",
+              { "aria-label": "Definição de " + p[0] },
+              h("option", { value: "" }, "Escolha..."),
+              defs.map((x) => h("option", { value: x }, x)),
+            );
+            area.append(h("p", {}, h("strong", {}, p[0] + ": "), s));
+            return s;
+          });
+          area.append(
+            h(
+              "button",
+              {
+                onclick: () => {
+                  const ok = sels.every((s, i) => s.value === pairs[i][1]);
+                  fin(
+                    ok,
+                    "Associações corretas: " +
+                      pairs.map((p) => p[0] + " = " + p[1]).join("; ") +
+                      ".",
+                  );
+                },
+              },
+              "Verificar",
+            ),
+          );
+        } else if (t === "or") {
+          it = take("or", bank("or"));
+          const picked = [],
+            out = h("ol"),
+            bx = h("div");
+          shuffle(it[1]).forEach((s) => {
+            const b = h(
+              "button",
+              {
+                class: "sec opt",
+                onclick: () => {
+                  picked.push(s);
+                  b.disabled = true;
+                  out.append(h("li", {}, s));
+                  if (picked.length === it[1].length) {
+                    const ok = picked.every((x, i) => x === it[1][i]);
+                    fin(
+                      ok,
+                      (ok ? "" : "Ordem correta: " + it[1].join(" → ") + ". ") +
+                        it[2],
+                    );
+                  }
+                },
+              },
+              s,
+            );
+            bx.append(b);
+          });
+          area.append(
+            h("h3", {}, "📋 Organize a ordem correta"),
+            h(
+              "p",
+              {},
+              it[0] + ". Clique nas ações na ordem em que devem ser feitas.",
+            ),
+            bx,
+            h("p", {}, "Sua ordem:"),
+            out,
+          );
+        } else if (t === "pass") {
+          const len = 8 + Math.floor(d / 4),
+            rules = [
+              ["letra maiúscula", /[A-Z]/],
+              ["letra minúscula", /[a-z]/],
+              ["número", /\d/],
+              ["símbolo (!@#$%...)", /[^A-Za-z0-9]/],
+            ].slice(0, Math.min(4, 2 + Math.floor(d / 6)));
+          const reqs = [
+            ["pelo menos " + len + " caracteres", (v) => v.length >= len],
+          ].concat(rules.map((r) => ["1 " + r[0], (v) => r[1].test(v)]));
+          if (d >= 10)
+            reqs.push([
+              'sem "123" nem a palavra "senha"',
+              (v) => !/123|senha/i.test(v),
+            ]);
+          const inp = h("input", {
+              type: "text",
+              autocomplete: "off",
+              "aria-label": "Senha fictícia",
+              maxlength: 40,
+            }),
+            lis = reqs.map((r) => h("li", {}, "⬜ " + r[0]));
+          const upd = () =>
+            reqs.forEach(
+              (r, i) =>
+                (lis[i].textContent = (r[1](inp.value) ? "✅ " : "⬜ ") + r[0]),
+            );
+          inp.addEventListener("input", upd);
+          area.append(
+            h("h3", {}, "🔑 Monte uma senha forte"),
+            h(
+              "p",
+              { class: "dim" },
+              "Crie uma senha FICTÍCIA. Nunca use a sua senha real.",
+            ),
+            inp,
+            h("ul", {}, lis),
+            h(
+              "button",
+              {
+                onclick: () => {
+                  const bad = reqs
+                    .filter((r) => !r[1](inp.value))
+                    .map((r) => r[0]);
+                  fin(
+                    !bad.length,
+                    bad.length
+                      ? "Faltou: " +
+                          bad.join("; ") +
+                          ". Tamanho e variedade de caracteres tornam a senha mais forte."
+                      : "Muito bem! Tamanho e variedade de caracteres aumentam a segurança. Uma frase-senha longa é ainda mais fácil de lembrar.",
+                  );
+                },
+              },
+              "Verificar senha",
+            ),
+          );
+        } else if (t === "caesar") {
+          const W = WORDS.filter((w) => w.length <= 5 + Math.floor(d / 6)),
+            w = take("cw", W),
+            k = 1 + rnd(Math.min(12, 3 + Math.floor(d / 2))),
+            enc = rnd(2) === 0;
+          const sh = (s, n) =>
+            [...s]
+              .map((c) =>
+                String.fromCharCode(
+                  ((c.charCodeAt(0) - 65 + n + 26) % 26) + 65,
+                ),
+              )
+              .join("");
+          const target = enc ? sh(w, k) : w,
+            inp = h("input", {
+              type: "text",
+              autocomplete: "off",
+              maxlength: 12,
+              "aria-label": "Resposta",
+            });
+          area.append(
+            h("h3", {}, "🔐 Cifra de César"),
+            h(
+              "p",
+              {},
+              enc
+                ? 'Criptografe "' +
+                    w +
+                    '" com chave ' +
+                    k +
+                    " (avance " +
+                    k +
+                    " letras no alfabeto)."
+                : 'Decifre "' +
+                    sh(w, k) +
+                    '", cifrada com chave ' +
+                    k +
+                    " (volte " +
+                    k +
+                    " letras).",
+            ),
+            h(
+              "p",
+              { class: "dim" },
+              "Alfabeto: A B C D E F G H I J K L M N O P Q R S T U V W X Y Z (depois do Z volta ao A)",
+            ),
+            inp,
+            h(
+              "button",
+              {
+                onclick: () =>
+                  fin(
+                    inp.value.trim().toUpperCase() === target,
+                    "Resposta: " +
+                      target +
+                      ". Na cifra de César, cada letra é deslocada pelo valor da chave.",
+                  ),
+              },
+              "Verificar",
+            ),
+          );
+        } else if (t === "phish") {
+          it = take("ph", PH);
+          area.append(
+            h("h3", {}, "🎣 Mensagem segura ou phishing?"),
+            h(
+              "div",
+              { class: "card" },
+              h("p", {}, "De: " + it[0]),
+              h("p", {}, it[1]),
+            ),
+          );
+          [
+            ["✅ Mensagem segura", false],
+            ["🎣 É phishing", true],
+          ].forEach(([l, v]) => {
+            const b = h(
+              "button",
+              {
+                class: "sec",
+                onclick: () => {
+                  const ok = v === it[2];
+                  b.classList.add(ok ? "ok" : "bad");
+                  fin(ok, it[3]);
+                },
+              },
+              l,
+            );
+            area.append(b);
+          });
+        } else if (t === "fw") {
+          const n = 3 + Math.min(3, Math.floor(d / 6)),
+            q = shuffle(
+              [].concat(
+                shuffle(FW.filter((x) => x[1])).slice(0, Math.ceil(n / 2)),
+                shuffle(FW.filter((x) => !x[1])).slice(0, Math.floor(n / 2)),
+              ),
+            );
+          let i = 0;
+          const pk = h("div", { class: "packet" }),
+            cnt = h("p");
+          const draw = () => {
+            cnt.textContent = "Pacote " + (i + 1) + " de " + q.length;
+            pk.textContent = "📦 " + q[i][0];
+            pk.style.animation = "none";
+            void pk.offsetWidth;
+            pk.style.animation = "";
+          };
+          const btn = (l, v) =>
+            h(
+              "button",
+              {
+                class: "sec",
+                onclick: () => {
+                  const p = q[i];
+                  if (v !== p[1]) {
+                    fin(
+                      false,
+                      (p[1]
+                        ? "Esse tráfego era seguro e esperado. "
+                        : "Esse tráfego era suspeito e deveria ser bloqueado. ") +
+                        "O firewall filtra o tráfego para proteger a rede.",
+                    );
+                    return;
+                  }
+                  i++;
+                  beep(520, 0.08);
+                  if (i === q.length)
+                    fin(
+                      true,
+                      "Você filtrou todo o tráfego corretamente: o firewall libera o seguro e bloqueia o suspeito.",
+                    );
+                  else draw();
+                },
+              },
+              l,
+            );
+          area.append(
+            h("h3", {}, "🧱 Simulação de firewall"),
+            h("p", {}, "Decida se cada pacote deve passar ou ser bloqueado."),
+            cnt,
+            pk,
+            h("div", { class: "wall" }),
+            h("div", {}, btn("✅ Permitir", true), btn("⛔ Bloquear", false)),
+          );
+          draw();
+        }
+      }
+
+      home(); // início
+    </script>
+  </body>
+</html>
